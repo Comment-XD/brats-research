@@ -11,14 +11,14 @@ class Upsample(nn.Module):
         self.out_channels = out_channels
         
         
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, 
+        self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, 
                                kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, 
+        self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, 
                                kernel_size=3, padding=1)
-        self.batchnorm1 = nn.BatchNorm2d(num_features=out_channels)
-        self.batchnorm2 = nn.BatchNorm2d(num_features=out_channels)
+        self.batchnorm1 = nn.BatchNorm3d(num_features=out_channels)
+        self.batchnorm2 = nn.BatchNorm3d(num_features=out_channels)
         
-        self.maxpool = nn.MaxPool2d(kernel_size=2)
+        self.maxpool = nn.MaxPool3d(kernel_size=2)
         
     
     def forward(self, x):        
@@ -37,18 +37,18 @@ class Downsample(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+        self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels,
                                kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels // 2,
+        self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels // 2,
                                kernel_size=3, padding=1)
         
-        self.conv_transpose1 = nn.ConvTranspose2d(in_channels=out_channels // 2, 
+        self.conv_transpose1 = nn.ConvTranspose3d(in_channels=out_channels // 2, 
                                                   out_channels=out_channels // 2,
                                                   kernel_size=2,
                                                   stride=2)
         
-        self.batchnorm1 = nn.BatchNorm2d(num_features=out_channels)
-        self.batchnorm2 = nn.BatchNorm2d(num_features=out_channels // 2)
+        self.batchnorm1 = nn.BatchNorm3d(num_features=out_channels)
+        self.batchnorm2 = nn.BatchNorm3d(num_features=out_channels // 2)
     
     
     def forward(self, x:torch.Tensor, connection:torch.Tensor, end=False):
@@ -75,17 +75,17 @@ class Downsample(nn.Module):
 class BottleNeck(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+        self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels,
                                kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels,
+        self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=3, padding=1)
-        self.conv_transpose1 = nn.ConvTranspose2d(in_channels=out_channels, 
+        self.conv_transpose1 = nn.ConvTranspose3d(in_channels=out_channels, 
                                                   out_channels=in_channels,
                                                   kernel_size=2,
                                                   stride=2)
         
-        self.batchnorm1 = nn.BatchNorm2d(num_features=out_channels)
-        self.batchnorm2 = nn.BatchNorm2d(num_features=out_channels)
+        self.batchnorm1 = nn.BatchNorm3d(num_features=out_channels)
+        self.batchnorm2 = nn.BatchNorm3d(num_features=out_channels)
         
     def forward(self, x):
         out = F.relu(self.batchnorm1(self.conv1(x)))
@@ -164,6 +164,10 @@ class UNet(nn.Module):
     
          ### TODO: create testing process for U-net, let me know if u have any questions relating to that
     
+    def predict(self, x):
+        pass
+    
+        ### TODO: Later on used to compare the segmentation of an output, probably going to use pyplot to begin with
     
     def __repr__(self):
         return f"UNet(in={self.in_channels}, out={self.out_channels})"

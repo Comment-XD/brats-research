@@ -1,52 +1,61 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
-import torchvision.transforms as transforms
 import os
-import nibabel as nib
 import glob
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 
-
-def dataloader(args, split="train"):
-    if split == "train":
-        return DataLoader(TrainDataset(), args.batch_size, num_workers=args.num_workers, shuffle=True)
-    if split == "val":
-        return
-
-
-### Take the image and apply normalization
-### What type of normalization?, We can apply greyscaling, and remove images that are beyond a certain percentage of labels
-### We can also use pytorch normalize
 
 class TrainDataset(Dataset):
-    def __init__(self):
-        super(Dataset, self).__init__()
-        self.root_path = "D:\Transfer\MICCAI_BraTS2020_TrainingData"  
+    def __init__(self, train_dir_path):
+        super().__init__()
 
-        flair_imgs_path = glob.glob("**\*flair.nii*", root_dir=self.root_path, recursive=True)
-        t1_imgs_path = glob.glob("**\*t1.nii*", root_dir=self.root_path, recursive=True)
-        t1ce_imgs_path = glob.glob("**\*t1ce.nii*", root_dir=self.root_path, recursive=True)
-        t2_imgs_path = glob.glob("**\*t2.nii*", root_dir=self.root_path, recursive=True)
-
-        self.dataset_path = list(zip(flair_imgs_path, t1_imgs_path, t1ce_imgs_path, t2_imgs_path))
-        self.label_path = glob.glob("**\*_seg*", root_dir=self.root_path, recursive=True)
-
+        # Root path is the train folder, but there is two seperate folders for images and labels
+        self.train_img_root = os.path.join(train_dir_path, "images")
+        self.train_label_root = os.path.join(train_dir_path, "label")
+        
+        self.train_img_paths = glob.glob("*.npy", root_dir=self.train_img_root)
+        self.train_label_paths = glob.glob("*.npy", root_dir=self.train_label_root)
+        
     def __len__(self):
-        return len(self.label_path)
+        return len(self.train_label_paths)
 
     def __getitem__(self, idx):
-        min_max_scalar = MinMaxScaler()
-        seg_mask_path = self.label_path[idx]
-        mri_imgs_path = self.dataset_path[idx]
+        img_path = self.train_img_paths[idx]
+        img_path = os.path.join(self.train_img_root, img_path)
+        
+        label_path = self.train_label_paths[idx]
+        label_path = os.path.join(self.train_label_root, label_path)
+        
+        img = np.load(img_path)
+        img = torch.from_numpy(img)
+        label = torch.from_numpy(np.load(label_path))
 
-        mri_imgs = []
-        seg_mask = nib.load(os.path.join(self.root_path, seg_mask_path)).get_fdata()
+        # return img, label     
+        return img, label
 
-        for img_path in mri_imgs_path:
-            
-            mri_img = nib.load(os.path.join(self.root_path, img_path)).get_fdata()
-            mri_img = min_max_scalar.fit_transform(mri_img.reshape(1, -1)).reshape(240,240,155)
-            mri_imgs.append(mri_img)
+class ValidationDataset(Dataset):
+    def __init__(self, val_dir_path):
+        super().__init__()
 
-        return mri_imgs, seg_mask
+        # Root path is the train folder, but there is two seperate folders for images and labels
+        self.val_img_root = os.path.join(val_dir_path, "images")
+        self.val_label_root = os.path.join(val_dir_path, "label")
+        
+        self.val_img_paths = glob.glob("*.npy", root_dir=self.val_img_root)
+        self.val_label_paths = glob.glob("*.npy", root_dir=self.val_label_root)
+        
+    def __len__(self):
+        return len(self.val_label_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.val_img_paths[idx]
+        img_path = os.path.join(self.val_img_paths, img_path)
+        
+        label_path = self.train_label_paths[idx]
+        label_path = os.path.join(self.train_label_root, label_path)
+        
+        img = np.load(img_path)
+        img = torch.from_numpy(img)
+
+        # return img, label     
+        return img
