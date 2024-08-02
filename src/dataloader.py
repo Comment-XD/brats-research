@@ -4,7 +4,10 @@ TRAIN_DATA_PATH = "D:/BratsDataset/train"
 VAL_DATA_PATH = "D:/BratsDataset/validation"
 
 def dataloader(args, split="train"):
-    assert split.lower() in ["train", "val"]
+    if split.lower() not in ["train", "val"]:
+        raise ValueError(
+            "arguement (split) must be either train, val, or test"
+        )
     
     if split == "train":
         return DataLoader(TrainDataset(TRAIN_DATA_PATH),

@@ -8,14 +8,14 @@ class FocalLoss(nn.Module):
         self.alpha = alpha
 
 
-class DiceCoefficient(nn.Module):
+class DiceLoss(nn.Module):
     '''
     soft-dice loss, useful in binary segmentation
     '''
     def __init__(self,
                  p=1,
                  smooth=1):
-        super(DiceCoefficient, self).__init__()
+        super(DiceLoss, self).__init__()
         
         self.p = p # optional to increase the values of A and B by a power of "p"
         self.smooth = smooth # Prevents the denominator from becoming 0
@@ -38,11 +38,6 @@ class DiceCoefficient(nn.Module):
         numer = (probs * labels).sum(dim=axes)
         
         denor = (probs.pow(self.p) + labels.pow(self.p)).sum(dim=axes)
-        return torch.mean((2 * numer + self.smooth) / (denor + self.smooth))
-
-
-def dice_loss(logits, labels, p=1, smooth=1):
-    dice_coef = DiceCoefficient(p, smooth)
-    return 1. - dice_coef(logits, labels)
+        return 1. - torch.mean((2 * numer + self.smooth) / (denor + self.smooth))
 
         

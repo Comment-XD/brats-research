@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as transforms
+from tqdm.auto import tqdm
 
 
 class Upsample(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels:int, out_channels:int):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -34,7 +34,7 @@ class Upsample(nn.Module):
 
 
 class Downsample(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels:int, out_channels:int):
         super().__init__()
 
         self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels,
@@ -51,13 +51,13 @@ class Downsample(nn.Module):
         self.batchnorm2 = nn.BatchNorm3d(num_features=out_channels // 2)
     
     
-    def forward(self, x:torch.Tensor, connection:torch.Tensor, end=False):
+    def forward(self, x:torch.Tensor, connection:torch.Tensor, end:bool=False):
         
         # x_width, x_height = (x.shape[-2], x.shape[-1])
         # crop = transforms.RandomCrop((x_width, x_height))
         # crop_connection = crop(connection)
         
-        print(x.size() == connection.size())
+        # print(x.size() == connection.size())
         
         out = torch.cat([x, connection], dim=1) # Concatanating them by the channels 
         out = F.relu(self.batchnorm1(self.conv1(out)))
@@ -97,31 +97,32 @@ class BottleNeck(nn.Module):
     def __repr__(self):
         return f"BottleNeck(in={self.in_channels}, out={self.out_channels})"
         
-class UNet(nn.Module):
+class VNet(nn.Module):
     
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        self.u1 = Upsample(in_channels, 64)
-        self.u2 = Upsample(64, 128)
-        self.u3 = Upsample(128, 256)
-        self.u4 = Upsample(256, 512)
+        self.u1 = Upsample(in_channels, 16)
+        self.u2 = Upsample(16, 32)
+        self.u3 = Upsample(32, 64)
+        self.u4 = Upsample(64, 128)
         
-        self.bottleneck = BottleNeck(512, 1024)
+        self.bottleneck = BottleNeck(128, 256)
         
-        self.d1 = Downsample(1024, 512)
-        self.d2 = Downsample(512, 256)
-        self.d3 = Downsample(256, 128)
-        self.d4 = Downsample(128, 64)
+        self.d1 = Downsample(256, 128)
+        self.d2 = Downsample(128, 64)
+        self.d3 = Downsample(64, 32)
+        self.d4 = Downsample(32, 16)
         
         self.segmenter = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, padding=1), 
-            nn.Conv2d(64, out_channels, kernel_size=1)
+            nn.Conv3d(16, 16, kernel_size=3, padding=1), 
+            nn.Conv3d(16, out_channels, kernel_size=1)
         )
     
-    ### TODO: Could we simply this u1, u2, u3. u4 to just loops?
+    ### TODO: Could we simplify this u1, u2, u3. u4 to just loops?
     
     def forward(self, x):
+        x = x.to(torch.float32) #why do i need to point my data in floating point 32?
         out, c4 = self.u1(x)
         out, c3 = self.u2(out)
         out, c2 = self.u3(out)
@@ -135,16 +136,19 @@ class UNet(nn.Module):
         out = self.d4(out, c4, end=True)
         
         out = self.segmenter(out)
-        out = F.softmax(out)
+        # out = F.softmax(out)
         
-        return out.size()
+        return out
     
-    def train(self, dataloader, optimizer, loss_fn):
+    def train_process(self, args, dataloader, optimizer, loss_fn, writer, epoch):
+        
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self = self.to(device) # sets the model to cuda if cuda exists
         
+        self.train() # Sets the model to train mode for Batchnorm
+        
         train_loss = 0
-        for batch_num, (X, y) in enumerate(dataloader):
+        for batch_num, (X, y) in tqdm(enumerate(dataloader)):
             
             X = X.to(device)
             y = y.to(device)
@@ -153,16 +157,53 @@ class UNet(nn.Module):
             loss = loss_fn(y_pred, y)
             train_loss += loss
             
+            if batch_num % 40 == 0:
+                print(f"Batch: {batch_num} ==> {len(dataloader)}")
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        
+        train_loss /= len(dataloader)
+        writer.add_scalar("vnet -train_loss/epochs", train_loss, epoch)
+        print(f"train loss : {train_loss:.5f}")
             
-        ### TODO: create training process for U-net, let me know if u have any questions relating to that
     
-    def test(self):
+    def test_process(self, args, dataloader, loss_fn, writer, epoch):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self = self.to(device) # sets the model to cuda if cuda exists
+        
+        self.eval() # Sets the model to evaluation mode for BatchNorm
+        
+        test_loss = 0
+        for batch_num, (X, y) in enumerate(dataloader):
+            
+            X = X.to(device)
+            y = y.to(device)
+            
+            y_pred = self.forward(X)
+            loss = loss_fn(y_pred, y)
+            
+            test_loss += loss
+            
+            ### Implement Save Frequency and checkpoint to for continued training
+            if batch_num % args.save_freq:
+                pass
+            
+            if batch_num % 5 == 0:
+                print(f"Batch: {batch_num} /==> {len(dataloader)}")
+            
+        
+        test_loss /= len(dataloader)
+        writer.add_scalar("vnet -train_loss/epochs", test_loss, epoch)
+        print(f"train loss : {test_loss:.5f}")
+    
+    
+    def save(self, save_path):
+        ### Saves the model after a period of time 
+        # torch.save(self.state_dict(), save_path)
+        
         pass
-    
-         ### TODO: create testing process for U-net, let me know if u have any questions relating to that
     
     def predict(self, x):
         pass
