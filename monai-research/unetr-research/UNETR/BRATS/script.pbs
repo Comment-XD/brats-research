@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+#PBS -l nodes=2:ppn=28:gpus=2   
+#PBS -l walltime=1000:00:00
+#PBS -m abe
+#PBS -M bchen9@students.kennesaw.
+#PBS -N UNTER training 
+#PBS -q gpuq
+
+JOBID=$( echo ${PBS_JOBID} | cut -f1 -d. )
+
+# Load the modules you need
+module load Anaconda3/2021.05
+
+#Load your conda environment
+module load Anaconda3/2021.05
+eval "$(conda shell.bash hook)"
+conda activate project_env
+
+# Change Directory to the working directory
+cd ${PBS_O_WORKDIR}
+
+# Run your code:
+python3 ${main.py}
